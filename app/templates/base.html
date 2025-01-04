@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>{% block title %}YouTube Search n Load{% endblock %}</title>
+</head>
+<body>
+    <div class="container">
+    <header>
+        <nav>
+            <ul>
+                <li><a class="btn" href="{{ url_for('main.home') }}">Search YouTube</a></li>
+                <li><a class="btn" href="{{ url_for('main.list_files') }}">Files</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+   
+    </div>
+    
+</body>
+</html> 

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}YouTube Search n Load{% endblock %}
+
+{% block content %}
+            <div class="SearchBlock">
+                <form class="selection">
+                    <label> Search for: </label>
+                    <input class="search"><br>
+                    <label>How many Results: </label>
+                    <input class="results" type="number" min="1" max="10" value="5" step="1">
+                    <button type="submit">Search</button>
+                </form>
+            </div>
+            
+            <dialog>
+                <form>
+                    <label>Choose a video:</label>
+                    <select class="videos">
+                        {% for video in videoList %}
+                        <option value="{{ video.id }}">{{ video.title }} ({{ video.channel }}) - {{ video.duration }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="sumbit">Download</button>
+                </form>
+            </dialog>
+            
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchForm = document.querySelector('.selection');
+        const videoForm = document.querySelector('dialog form');
+        
+        searchForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const searchInput = document.querySelector('.search').value;
+            const resultsInput = document.querySelector('.results').value;
+            
+            if (searchInput && resultsInput) {
+                fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({query: searchInput, maxResults: resultsInput}),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        // Clear previous options
+                        const videoSelect = document.querySelector('.videos');
+                        videoSelect.innerHTML = ''; // Clear existing options
+
+                        // Populate the select element with new video options
+                        data.forEach(video => {
+                            const option = document.createElement('option');
+                            option.value = video.id; // Assuming video.id is the correct property
+                            option.textContent = `${video.title} (Channel: ${video.channel}) - ${video.duration}`;
+                            videoSelect.appendChild(option);
+                        });
+
+                        document.querySelector('dialog').showModal();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            } else {
+                alert('Please fill in both search and results fields.');
+            }
+        });
+
+        videoForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const videoSelect = document.querySelector('.videos');
+            const videoOption = videoSelect.options[videoSelect.selectedIndex];
+            
+            if (videoOption) {
+                const videoId = videoOption.value; // Assuming value is set on each option
+                fetch('/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({video_id: videoId}),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert(data.message);
+                        // Show the download link
+                        
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            } else {
+                alert('Please select a video.');
+            }
+        });
+
+        function fetchAvailableVideos() {
+            fetch('/videos') // Assuming you have an endpoint to list videos
+                .then(response => response.json())
+                .then(data => {
+                    const videoSelect = document.querySelector('.video-select');
+                    videoSelect.innerHTML = ''; // Clear existing options
+
+                    data.forEach(video => {
+                        const option = document.createElement('option');
+                        option.value = video; // Assuming video is the filename
+                        option.textContent = video; // Display the filename
+                        videoSelect.appendChild(option);
+                    });
+
+                    // Show the download button if there are videos
+                    const downloadButton = document.getElementById('downloadButton');
+                    downloadButton.style.display = data.length > 0 ? 'block' : 'none';
+                })
+                .catch(error => console.error('Error fetching videos:', error));
+            }
+
+        // Call the function to fetch available videos on page load
+        fetchAvailableVideos();
+
+        // Event listener for the download button
+        document.getElementById('downloadButton').addEventListener('click', function() {
+            const videoSelect = document.querySelector('.video-select');
+            const selectedVideo = videoSelect.value;
+
+            if (selectedVideo) {
+                const encodedFilename = encodeURIComponent(selectedVideo);
+                window.location.href = `/video/${encodedFilename}`; // Download the selected video
+            } else {
+                alert('Please select a video to download.');
+            }
+        });
+    });
+    </script>
+    {% endblock %}
