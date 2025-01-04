@@ -21,6 +21,7 @@
                         <option value="{{ video.id }}">{{ video.title }} ({{ video.channel }}) - {{ video.duration }}</option>
                         {% endfor %}
                     </select>
+                    <progress id="downloadProgress" value="0" max="100" style="display:none;"></progress> <!-- Added progress bar -->
                     <button type="sumbit">Download</button>
                 </form>
             </dialog>
@@ -29,6 +30,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const searchForm = document.querySelector('.selection');
         const videoForm = document.querySelector('dialog form');
+        
         
         searchForm.addEventListener('submit', function(event) {
             event.preventDefault();
@@ -70,35 +72,49 @@
         });
 
         videoForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            const videoSelect = document.querySelector('.videos');
-            const videoOption = videoSelect.options[videoSelect.selectedIndex];
-            
-            if (videoOption) {
-                const videoId = videoOption.value; // Assuming value is set on each option
-                fetch('/download', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({video_id: videoId}),
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                    } else {
-                        alert(data.message);
-                        // Show the download link
-                        
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-            } else {
-                alert('Please select a video.');
-            }
-        });
+        event.preventDefault();
 
+        const videoSelect = document.querySelector('.videos');
+        const videoOption = videoSelect.options[videoSelect.selectedIndex];
+        const progressBar = document.getElementById('downloadProgress'); // Reference to the progress bar
+
+        if (videoOption) {
+            const videoId = videoOption.value; // Video ID from the selected option
+            progressBar.style.display = 'block'; // Show the progress bar
+            progressBar.value = 0; // Reset progress bar
+
+            // Create a new EventSource for progress updates
+            const eventSource = new EventSource(`/download/${videoId}`);
+
+            eventSource.onmessage = function(event) {
+                const data = event.data;
+                console.log(data); // Log for debugging
+
+                // Parse and update the progress bar
+                const match = data.match(/(\d+)%/);
+                if (match) {
+                    const progress = parseInt(match[1], 10);
+                    progressBar.value = progress; // Update progress bar value
+                }
+
+                // Check for completion message
+                if (data.includes("Download complete!")) {
+                    eventSource.close(); // Close the connection
+                    progressBar.style.display = 'none'; // Hide progress bar
+                    alert("Download complete!");
+                }
+            };
+
+            eventSource.onerror = function(event) {
+                console.error("Error occurred while receiving updates.", event);
+                progressBar.style.display = 'none'; // Hide progress bar on error
+                eventSource.close(); // Ensure the connection is closed
+                alert("An error occurred while downloading. Please try again.");
+            };
+        } else {
+            alert('Please select a video.');
+        }
+        });
         function fetchAvailableVideos() {
             fetch('/videos') // Assuming you have an endpoint to list videos
                 .then(response => response.json())

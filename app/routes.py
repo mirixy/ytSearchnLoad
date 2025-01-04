@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template, request, jsonify, send_from_directory
+from flask import Blueprint, render_template, request, jsonify, send_from_directory, Response
 from app.search_yt import search_youtube, download_video, get_videos
+import subprocess
 import os
 main = Blueprint("main", __name__)
 
@@ -29,15 +30,36 @@ def search():
     results = search_youtube(search_query, int(max_results))
     return jsonify(results), 200
 
-@main.route('/download', methods=['POST'])
-def download():
-    video_id = request.json.get('video_id')
+@main.route('/download/<video_id>', methods=['GET'])
+def download(video_id):
     if not video_id:
         return jsonify({"error": "Video ID is required"}), 400
 
-    # Call the download_video function
-    download_video(video_id)
-    return jsonify({"message": "Download started"}), 200
+    def generate():
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        command = [
+            "yt-dlp",
+            f"--output=videos/%(title)s.%(ext)s",
+            url,
+            "--progress",
+        ]
+
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+        for line in iter(process.stdout.readline, ''):
+            if line.strip():
+                print(f"Server Output: {line.strip()}")  # Debugging log
+                yield f"data: {line.strip()}\n\n"  # Send formatted data to client
+
+        process.stdout.close()
+        process.wait()
+
+        if process.returncode == 0:
+            yield "data: Download complete!\n\n"
+        else:
+            yield "data: Error occurred during download.\n\n"
+
+    return Response(generate(), content_type='text/event-stream')
 
 @main.route('/videos', methods=['GET'])
 def list_videos():
